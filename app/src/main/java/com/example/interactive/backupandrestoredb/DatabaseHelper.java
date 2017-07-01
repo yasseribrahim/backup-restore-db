@@ -18,7 +18,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     @Override
     public void onCreate(SQLiteDatabase db) {
-        String sql = "CREATE TABLE todos (" +
+        String sql = "CREATE TABLE tbl_todos (" +
                 " _id INTEGER PRIMARY KEY," +
                 " name TEXT," +
                 " score REAL)";

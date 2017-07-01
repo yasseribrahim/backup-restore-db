@@ -16,10 +16,16 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.gson.Gson;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
     public static final String TAG = MainActivity.class.getSimpleName();
@@ -33,16 +39,16 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        createBtn = (Button)findViewById(R.id.button);
-        readBtn = (Button)findViewById(R.id.button2);
-        updateBtn = (Button)findViewById(R.id.button3);
-        deleteBtn = (Button)findViewById(R.id.button4);
-        backupBtn = (Button)findViewById(R.id.button5);
-        restoreBtn = (Button)findViewById(R.id.button6);
+        createBtn = (Button) findViewById(R.id.button);
+        readBtn = (Button) findViewById(R.id.button2);
+        updateBtn = (Button) findViewById(R.id.button3);
+        deleteBtn = (Button) findViewById(R.id.button4);
+        backupBtn = (Button) findViewById(R.id.button5);
+        restoreBtn = (Button) findViewById(R.id.button6);
 
-        tid = (EditText)findViewById(R.id.editText);
-        name = (EditText)findViewById(R.id.editText2);
-        score = (EditText)findViewById(R.id.editText3);
+        tid = (EditText) findViewById(R.id.editText);
+        name = (EditText) findViewById(R.id.editText2);
+        score = (EditText) findViewById(R.id.editText3);
 
         helper = new DatabaseHelper(this);
         db = helper.getWritableDatabase();
@@ -55,7 +61,7 @@ public class MainActivity extends AppCompatActivity {
                 cv.put("_id", Integer.parseInt(tid.getText().toString()));
                 cv.put("name", name.getText().toString());
                 cv.put("score", Double.parseDouble(score.getText().toString()));
-                id = db.insert("todos", null, cv);
+                id = db.insert("tbl_todos", null, cv);
                 Log.i(TAG, "Inserted: " + id);
             }
         });
@@ -63,7 +69,7 @@ public class MainActivity extends AppCompatActivity {
         readBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                sqlQuery("SELECT * FROM " + "todos");
+                sqlQuery("SELECT * FROM " + "tbl_todos");
             }
         });
 
@@ -74,7 +80,7 @@ public class MainActivity extends AppCompatActivity {
                 int id = Integer.parseInt(tid.getText().toString());
                 ContentValues cv = new ContentValues();
                 cv.put("score", Double.parseDouble(score.getText().toString()));
-                count = db.update("todos", cv, "_id=" + id, null);
+                count = db.update("tbl_todos", cv, "_id=" + id, null);
                 Log.i(TAG, "Updated: " + count);
             }
         });
@@ -84,7 +90,7 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View v) {
                 int count;
                 int id = Integer.parseInt(tid.getText().toString());
-                count = db.delete("todos" + "", "_id=" + id, null);
+                count = db.delete("tbl_todos" + "", "_id=" + id, null);
                 Log.i(TAG, "Deleted: " + count);
             }
         });
@@ -102,6 +108,8 @@ public class MainActivity extends AppCompatActivity {
                 restore();
             }
         });
+
+        tables();
     }
 
     public void restore() {
@@ -158,12 +166,12 @@ public class MainActivity extends AppCompatActivity {
         String str = "";
         Cursor c = db.rawQuery(sql, null);
         colNames = c.getColumnNames();
-        for(int i = 0; i < colNames.length; i++){
+        for (int i = 0; i < colNames.length; i++) {
             str += colNames[i] + "\t\t";
         }
         str += "\n";
         c.moveToFirst();
-        for(int i = 0; i < c.getCount(); i++) {
+        for (int i = 0; i < c.getCount(); i++) {
             str += c.getString(0) + "\t";
             str += c.getString(1) + "\t";
             str += c.getString(2) + "\n";
@@ -191,5 +199,61 @@ public class MainActivity extends AppCompatActivity {
                 break;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    public void tables() {
+        Cursor cursor1 = db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'", null);
+        String table;
+        Map<String, List<Map>> data = new HashMap<>();
+        List<Map> datatable;
+        try {
+            if (cursor1.moveToNext()) {
+                do {
+                    table = cursor1.getString(0);
+                    if (table.startsWith("tbl_")) {
+                        datatable = new ArrayList<>();
+                        data.put(table, datatable);
+                        Cursor cursor2 = db.rawQuery("SELECT * FROM " + table, null);
+                        try {
+                            String[] columnNames = cursor2.getColumnNames();
+                            if (cursor2.moveToNext()) {
+                                do {
+                                    Map map = new HashMap();
+                                    datatable.add(map);
+                                    int index, type;
+                                    for (String columnName : columnNames) {
+                                        index = cursor2.getColumnIndex(columnName);
+                                        type = cursor2.getType(index);
+                                        switch (type) {
+                                            case Cursor.FIELD_TYPE_INTEGER:
+                                                map.put(columnName, cursor2.getInt(index));
+                                                break;
+                                            case Cursor.FIELD_TYPE_FLOAT:
+                                                map.put(columnName, cursor2.getFloat(index));
+                                                break;
+                                            case Cursor.FIELD_TYPE_BLOB:
+                                                map.put(columnName, cursor2.getBlob(index));
+                                                break;
+                                            default:
+                                                map.put(columnName, cursor2.getString(index));
+                                                break;
+                                        }
+                                    }
+                                } while (cursor2.moveToNext());
+                            }
+                        } finally {
+                            cursor2.close();
+                        }
+                    }
+                }
+                while (cursor1.moveToNext());
+            }
+        } finally {
+            if (cursor1 != null) {
+                cursor1.close();
+            }
+        }
+        String message = new Gson().toJson(data);
+        Log.i(TAG, message);
     }
 }
